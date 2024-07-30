@@ -1,88 +1,89 @@
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support.wait import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
+from faker import Faker
+
+from page_objects.admin_page import AdminPage
+from page_objects.catalog_page import CatalogPage
+from page_objects.main_page import MainPage
+from page_objects.product_page import ProductPage, CartPage
+from page_objects.user_page import LoginPage, RegisterPage
 
 
 def test_main_page(browser):
-    menu = browser.find_elements(By.CSS_SELECTOR, "ul.navbar-nav > li")
+    main_page = MainPage(browser)
+    menu = main_page.get_menu_items()
     assert len(menu) == 8, "элементов в меню больше"
 
 
+def test_currency_main(browser):
+    main_page = MainPage(browser)
+    main_page.open_catalog(browser.current_url + "/en-gb/apple?route=product/manufacturer.info")
+    selected_currency = main_page.check_switch_currency("£ Pound Sterling", "£67.38")
+    assert selected_currency == '£67.38', "валюта не поменялась"
+
+
 def test_catalog_page(browser):
-    wait = WebDriverWait(browser, 5, poll_frequency=1)
-    browser.get(browser.current_url + "/en-gb/apple?route=product/manufacturer.info")
-    iphone = browser.find_element(By.XPATH, "//a[normalize-space()='iPhone']")
-    wait.until(EC.element_to_be_clickable(iphone))
+    catalog_page = CatalogPage(browser)
+    catalog_page.open_catalog(browser.current_url + "/en-gb/apple?route=product/manufacturer.info")
+    iphone = catalog_page.get_iphone_element()
+    assert iphone.is_displayed(), "iPhone не отображается"
 
 
 def test_product_page(browser):
-    wait = WebDriverWait(browser, 5, poll_frequency=1)
-    browser.get(browser.current_url + "/en-gb/product/apple/iphone")
-    product_title = wait.until(
-        EC.presence_of_element_located((By.XPATH, "//h1[normalize-space()='iPhone']"))
-    )
+    product_page = ProductPage(browser)
+    product_page.open_product(browser.current_url + "/en-gb/product/apple/iphone")
+    product_title = product_page.get_product_title()
     assert product_title.is_displayed(), "Страница товара не отображается"
 
 
-def test_currency_catalog(browser):
-    browser.get(browser.current_url + "/en-gb/apple?route=product/manufacturer.info")
-    browser.find_element(By.ID, "form-currency").click()
-    browser.find_element(By.XPATH, "//a[normalize-space()='£ Pound Sterling']").click()
-    cur = browser.find_element(By.XPATH, "//span[normalize-space()='£67.38']")
-    assert cur.text == '£67.38', "валюта не поменялась"
-
-
-def test_currency_main(browser):
-    browser.find_element(By.ID, "form-currency").click()
-    browser.find_element(By.XPATH, "//a[normalize-space()='$ US Dollar']").click()
-    cur = browser.find_element(By.XPATH, "//span[normalize-space()='$602.00']")
-    assert cur.text == '$602.00', "валюта не поменялась"
-
-
 def test_add_product(browser):
-    product = browser.find_element(By.XPATH, '//button[@aria-label="Add to Cart"]')
-    product.click()
-    browser.find_element(By.ID, "cart").click()
-    cart_items = browser.find_elements(By.CLASS_NAME, "fa-solid fa-cart-shopping")
+    product_page = ProductPage(browser)
+    cart_page = CartPage(browser)
+    product_page.add_product()
+    cart_items = cart_page.get_cart_items()
     assert len(cart_items) > 0, "Товар не был добавлен в корзину"
 
 
-def test_login_page(browser):
-    wait = WebDriverWait(browser, 5, poll_frequency=1)
-    browser.get(browser.current_url + "/administration")
-    username = browser.find_element(By.ID, 'input-username')
-    username.send_keys("user")
-    password = browser.find_element(By.ID, 'input-password')
-    password.send_keys("bitnami")
-    login = browser.find_element(By.XPATH, "//button[normalize-space()='Login']")
-    login.click()
-    dashboard = wait.until(
-        EC.visibility_of_element_located((By.XPATH, "//h1[normalize-space()='Dashboard']"))
-    )
-    assert dashboard.is_displayed(), "Страница не отображается"
+def test_currency_catalog(browser):
+    catalog_page = CatalogPage(browser)
+    catalog_page.open_catalog(browser.current_url + "/en-gb/apple?route=product/manufacturer.info")
+    selected_currency = catalog_page.switch_currency("£ Pound Sterling", "£67.38")
+    assert selected_currency == '£67.38', "валюта не поменялась"
 
-    logout = browser.find_element(By.XPATH, "//span[normalize-space()='Logout']")
-    logout.click()
-    assert login.is_displayed()
+
+def test_login_page(browser):
+    login_page = LoginPage(browser)
+    login_page.open_login_page(browser.current_url + "/administration")
+    login_page.login("user", "bitnami")
+    dashboard = login_page.check_dashboard()
+    assert dashboard.is_displayed(), "Страница не отображается"
+    login_page.logout()
+    assert dashboard.is_displayed()
 
 
 def test_register_account(browser):
-    wait = WebDriverWait(browser, 7, poll_frequency=1)
-    browser.get(browser.current_url + "/index.php?route=account/register")
-
-    firstname = browser.find_element(By.ID, 'input-firstname')
-    firstname.send_keys("ivan")
-    lastname = browser.find_element(By.ID, 'input-lastname')
-    lastname.send_keys("ivanov")
-    email = browser.find_element(By.ID, 'input-email')
-    email.send_keys("testemail.ru")
-    password = browser.find_element(By.ID, 'input-password')
-    password.send_keys("test1322")
-    agreement = browser.find_element(By.NAME, "agree")
-    agreement.click()
-    register = browser.find_element(By.XPATH, "//button[normalize-space()='Continue']")
-    register.click()
-    register_success = wait.until(
-        EC.visibility_of_element_located((By.XPATH, "//h1[normalize-space()='Your Account Has Been Created!']"))
-    )
+    fake = Faker("es_ES")
+    register_page = RegisterPage(browser)
+    register_page.open_register_page(browser.current_url + "/index.php?route=account/register")
+    register_page.register(fake.first_name(), fake.last_name(), fake.email(), fake.password())
+    register_success = register_page.get_register_success()
     assert register_success.is_displayed(), "Страница не отображается"
+
+
+def test_add_product_from_admin_panel(browser):
+    fake = Faker("es_ES")
+    admin_page = AdminPage(browser)
+    admin_page.open_admin_panel(browser.current_url + "/index.php?route=catalog/product")
+    admin_page.fill_general_tab(fake.random_company_product(), fake.random_int(100, 1000))
+    admin_page.fill_data_tab(fake.word("andsudsweoiwow"))
+    admin_page.fill_seo_tab(fake.word("andsudswow"))
+    alert_success = admin_page.get_alert_success()
+    assert alert_success.is_displayed(), "Warning: Please check the form carefully for errors!"
+
+
+def test_delete_product(browser):
+    admin_page = AdminPage(browser)
+    admin_page.open_admin_panel(browser.current_url + "/index.php?route=catalog/product")
+    admin_page.delete_product()
+    confirm_alert = browser.switch_to.alert
+    confirm_alert.dismiss()
+    alert_success = admin_page.get_alert_success()
+    assert alert_success.is_displayed(), "Warning: not delete"
