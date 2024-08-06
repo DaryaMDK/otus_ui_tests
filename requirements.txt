@@ -1,3 +1,5 @@
-pytest~=8.2.2
-selenium~=4.22.0
-Faker~=26.0.0
+pytest==8.2.2
+selenium==4.22.0
+Faker==26.0.0
+logging==0.4.9.6
+allure-pytest==2.13.5
