@@ -100,3 +100,4 @@ def test_delete_product(browser):
     confirm_alert.dismiss()
     alert_success = admin_page.get_alert_success()
     assert alert_success.is_displayed(), "Warning: not delete"
+

@@ -1,71 +1,65 @@
 import datetime
 import logging
-import pytest
 import allure
+import pytest
 from selenium import webdriver
-from selenium.webdriver.chrome.options import Options as ChromeOptions
-from selenium.webdriver.chrome.service import Service
-from selenium.webdriver.firefox.options import Options as FFOptions
+from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.firefox.options import Options as FirefoxOptions
 
 
 def pytest_addoption(parser):
-    parser.addoption("--browser", default="ch", choices=["ya", "ch", "ff", "sa"])
+    parser.addoption("--browser", default="chrome", choices=["chrome", "firefox"])
+    parser.addoption("--vnc", action="store_true")
     parser.addoption("--headless", action="store_true")
-    parser.addoption("--yadriver", default="E:/drivers/yandexdriver")
-    parser.addoption("--url", action="store", default="http://localhost/")
     parser.addoption("--log_level", action="store", default="INFO")
+    parser.addoption("--selenoid_url", action="store", default="http://localhost:4444/wd/hub")
 
 
-@pytest.fixture()
+@pytest.fixture
 def browser(request):
     browser_name = request.config.getoption("--browser")
     headless = request.config.getoption("--headless")
-    yadriver = request.config.getoption("--yadriver")
-    url = request.config.getoption("--url")
+    vnc = request.config.getoption("--vnc")
     log_level = request.config.getoption("--log_level")
+    selenoid_url = request.config.getoption("--selenoid_url")
 
     logger = logging.getLogger(request.node.name)
     file_handler = logging.FileHandler(f"logs/{request.node.name}.log")
     file_handler.setFormatter(logging.Formatter('%(levelname)s %(message)s'))
     logger.addHandler(file_handler)
     logger.setLevel(level=log_level)
-
     logger.info("===> Test %s started at %s" % (request.node.name, datetime.datetime.now()))
-    driver = None
 
-    if browser_name == "ch":
-        options = ChromeOptions()
-        if headless:
-            options.add_argument("--headless=new")
-        driver = webdriver.Chrome(service=Service(), options=options)
+    options = None
+    capabilities = None
 
-    elif browser_name == "ff":
-        options = FFOptions()
-        if headless:
-            options.add_argument("--headless")
-        driver = webdriver.Firefox(options=options)
+    if browser_name == "chrome":
+        options = Options()
+        if vnc:
+            capabilities = {
+                "selenoid:options": {
+                    "enableVNC": True,
+                    "enableVideo": False
+                }
+            }
+    elif browser_name == "firefox":
+        options = FirefoxOptions()
+        if vnc:
+            capabilities = {
+                "selenoid:options": {
+                    "enableVNC": True,
+                    "enableVideo": False
+                }
+            }
+    else:
+        raise ValueError("Unsupported browser")
 
-    elif browser_name == "ya":
-        options = ChromeOptions()
-        if headless:
-            options.add_argument("headless=new")
-        options.binary_location = "E:/drivers/yandexdriver"
-        driver = webdriver.Chrome(
-            options=options,
-            service=Service(executable_path=yadriver)
-        )
-    elif browser_name == "sa":
-        driver = webdriver.Safari()
-
-    elif browser_name == "eg":
-        options = ChromeOptions()
-        if headless:
-            options.add_argument("headless=new")
-        driver = webdriver.Edge(options=options)
+    driver = webdriver.Remote(
+        command_executor=selenoid_url,
+        options=options,
+    )
 
     driver.set_window_size(1920, 1080)
-    driver.get(url)
-    driver.url = url
     driver.log_level = log_level
     driver.logger = logger
     driver.test_name = request.node.name
@@ -74,6 +68,7 @@ def browser(request):
 
     yield driver
 
+    logger.info("===> Test %s finished at %s" % (request.node.name, datetime.datetime.now()))
     driver.quit()
 
 
